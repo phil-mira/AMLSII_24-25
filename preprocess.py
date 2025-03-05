@@ -1,4 +1,11 @@
+import pandas as pd
+
+
+
 # Remove duplicates
+
+
+
 
 # Group same people together
 
@@ -6,4 +13,6 @@
 
 # Balance number of images per patient in each 
 
-# Create a split 
+
+
+
