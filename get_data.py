@@ -25,22 +25,52 @@ def process_image(image_names, file_name, competition_name):
     # Download and process selected images
     for image in image_names:
         image_zip_path = image_folder_path + image + ".jpg.zip"
+        image_path = image_folder_path + image + ".jpg"
         kaggle.api.competition_download_file(
             competition_name, f"jpeg/{dataset}/{image}.jpg", path=image_folder_path)
 
         # Unzip the downloaded image
-        if os.path.exists(image_zip_path):
-            with zipfile.ZipFile(image_zip_path, "r") as z:
-                z.extractall(image_folder_path)
-            os.remove(image_zip_path)
-
+        if os.path.exists(image_zip_path) or os.path.exists(image_path):
+            if os.path.exists(image_zip_path):
+                with zipfile.ZipFile(image_zip_path, "r") as zip_file:
+                    zip_file.extractall(image_folder_path)
+                os.remove(image_zip_path)
+         
             # Reduce resolution and compress
-            image_path = image_folder_path + image + ".jpg"
             with Image.open(image_path) as img:
                 # Resize to 12.5% of original size
                 img = img.resize((256, 256), Image.Resampling.LANCZOS)
                 # Save with compression
                 img.save(image_path, "JPEG", quality=60)
+
+
+
+def verify_image_sizes(image_folder_path):
+    """
+    Checks if all images in the folder have been properly resized to 256x256.
+    
+    Args:
+        image_folder_path - path to folder containing images
+    
+    Returns:
+        bool: True if all images are 256x256, False otherwise
+    """
+    all_correct_size = True
+    image_files = glob.glob(os.path.join(image_folder_path, "*.jpg"))
+    
+    for image_path in image_files:
+        with Image.open(image_path) as img:
+            width, height = img.size
+            if width != 256 or height != 256:
+                print(f"Warning: {os.path.basename(image_path)} is {width}x{height}, not 256x256")
+
+
+    if all_correct_size:
+        print(f"All images in {image_folder_path} are correctly sized at 256x256")
+    else:
+        print(f"Some images in {image_folder_path} are not properly sized")
+    
+    return all_correct_size
 
 
 def get_files_process(competition_name, file_name, samples):
@@ -55,6 +85,7 @@ def get_files_process(competition_name, file_name, samples):
     csv_path = ("data/" + file_name)
 
     # Download only the required file
+
     kaggle.api.competition_download_file(
         competition_name, file_name, path="data/")
 
@@ -83,3 +114,6 @@ def run(train_samples, test_samples):
 
     get_files_process(competition_name, train_file, samples=train_samples)
     get_files_process(competition_name, test_file, samples=test_samples)
+
+    verify_image_sizes("data/train_images")
+    verify_image_sizes("data/test_images")

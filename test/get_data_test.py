@@ -40,6 +40,13 @@ class TestGetData(unittest.TestCase):
             image_folder) if f.endswith('.jpg')])
         self.assertEqual(image_count, self.samples)
 
+    def test_image_dimensions(self):
+        image_folder = f"data/train_images/"
+        for image_file in os.listdir(image_folder):
+            if image_file.endswith('.jpg'):
+                with Image.open(f"{image_folder}{image_file}") as img:
+                    self.assertEqual(img.size, (256, 256), f"Image {image_file} is not 256x256 pixels")
+
     def tearDown(self):
         # Clean up test files
         if os.path.exists("data"):
