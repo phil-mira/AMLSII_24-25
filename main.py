@@ -4,7 +4,7 @@ import json
 
 
 import get_data
-from preprocess import preprocess
+from preprocess import preprocess, one_hot
 from synthetic_data_generate import advanced_augmentation
 from data_utils import create_dataloaders
 from train_validate import train
@@ -103,36 +103,32 @@ def main():
 
         print(f"After filtering: {len(train_data)} training samples, {len(val_data)} validation samples, {len(test_data)} test samples")
 
-
-
-    model = MixedInputModel()
-
+    train_data, val_data, test_data = one_hot(train_data, val_data, test_data)
+   
     # Define hyperparameters
-    batch_size = 4
-    num_epochs = 10
-    learning_rate = 0.001
+    batch_size = 8
+    num_epochs = 4
+    learning_rate = 0.0001
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_dir = 'saved_models'
 
     tabular_features = train_data.columns[2:-1].to_list()
-
     train_loader, val_loader = create_dataloaders(train_data, val_data, train_dataset_path, 
                        img_id_column='image_name',
                        target_column='target',
                        tabular_columns=tabular_features,
                        batch_size=batch_size
                        )
-    
-
-    
-    """    
-
+   
     # Create directory for saving models if it doesn't exist
     os.makedirs(model_dir, exist_ok=True)
+
+    model = MixedInputModel(num_tabular_features=len(tabular_features))
 
     # Define loss function and optimizer
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
 
     print(f"Training on {device} with {len(train_data)} training samples, {len(val_data)} validation samples")
 
@@ -140,7 +136,7 @@ def main():
     train(model, train_loader, val_loader, criterion, optimizer, 
                      device, num_epochs, model_dir, checkpoint_freq=1, save_best_only=True, 
                      early_stopping_patience=None, start_epoch=0)
-    """
+ 
 
 if __name__ == "__main__":
 
