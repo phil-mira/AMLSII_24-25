@@ -80,3 +80,8 @@ class TestPreprocess(unittest.TestCase):
         self.assertEqual(len(train_dups), 0)
         self.assertEqual(len(val_dups), 0)
         self.assertEqual(len(test_dups), 0)
+
+        
+
+if __name__ == "__main__":
+    unittest.main()
