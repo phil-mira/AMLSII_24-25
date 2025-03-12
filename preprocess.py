@@ -38,6 +38,50 @@ def create_validation(train_data, val_size):
     train_data = train_data.iloc[:id_to_split]
 
     return train_data, val_data
+
+def one_hot(train_data, val_data, test_data):
+      # One-hot encode categorical features
+    print("Applying one-hot encoding to categorical features...")
+
+    # Identify categorical columns (explicitly defining them for clarity)
+    categorical_columns = ['sex', 'anatom_site_general_challenge']
+
+    # Apply one-hot encoding
+    train_data_encoded = pd.get_dummies(train_data, columns=categorical_columns, drop_first=False)
+    val_data_encoded = pd.get_dummies(val_data, columns=categorical_columns, drop_first=False)
+    test_data_encoded = pd.get_dummies(test_data, columns=categorical_columns, drop_first=False)
+
+    # Ensure all datasets have the same columns (in case some categories only appear in certain splits)
+    all_columns = set(train_data_encoded.columns).union(set(val_data_encoded.columns)).union(set(test_data_encoded.columns))
+    for column in all_columns:
+        if column not in train_data_encoded:
+            train_data_encoded[column] = 0
+        if column not in val_data_encoded:
+            val_data_encoded[column] = 0
+        if column not in test_data_encoded:
+            test_data_encoded[column] = 0
+
+    # Replace original dataframes with encoded versions
+    train_data = train_data_encoded
+    val_data = val_data_encoded
+    test_data = test_data_encoded
+
+    # Drop the diagnosis and benign_malignant columns
+    train_data = train_data.drop(['diagnosis', 'benign_malignant'], axis=1)
+    val_data = val_data.drop(['diagnosis', 'benign_malignant'], axis=1)
+
+    # Move target column to the end
+    target_col = 'target'
+    for df in [train_data, val_data, test_data]:
+        target_values = df[target_col].copy()
+        df.drop(target_col, axis=1, inplace=True)
+        df[target_col] = target_values
+
+    print(f"After encoding: train_data has {train_data.shape[1]} features, val_data has {val_data.shape[1]} features")
+    
+    return train_data, val_data, test_data
+
+     
      
 
 def preprocess():
@@ -47,6 +91,11 @@ def preprocess():
     val_size = len(test_df)
 
     remove_duplicates(train_df, test_df, duplicates_df)
+    
+    train_df = train_df.dropna()
+    test_df = test_df.dropna()
+   
+
     train_df, val_df = create_validation(train_df, val_size)
     
     return train_df, val_df, test_df
