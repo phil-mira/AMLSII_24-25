@@ -20,7 +20,7 @@ class MixedInputModel(nn.Module):
             Whether to use pretrained weights for the image model
     """
     def __init__(self, num_tabular_features, num_classes=2, 
-                 tabular_hidden_dims=[64, 32], dropout_rate=0.2, pretrained=True):
+                 tabular_hidden_dims=[64, 32], pretrained=True):
         super(MixedInputModel, self).__init__()
         
         # Image feature extractor (ResNet18)
@@ -36,7 +36,6 @@ class MixedInputModel(nn.Module):
             tabular_layers.append(nn.Linear(input_dim, hidden_dim))
             tabular_layers.append(nn.BatchNorm1d(hidden_dim))
             tabular_layers.append(nn.ReLU())
-            tabular_layers.append(nn.Dropout(dropout_rate))
             input_dim = hidden_dim
             
         self.tabular_model = nn.Sequential(*tabular_layers)
@@ -47,8 +46,8 @@ class MixedInputModel(nn.Module):
             nn.Linear(combined_dim, 128),
             nn.BatchNorm1d(128),
             nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(128, num_classes)
+            nn.Linear(128, num_classes),
+            nn.Softmax(dim=0)
         )
         
     def forward(self, image, tabular):
