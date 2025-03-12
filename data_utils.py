@@ -38,11 +38,19 @@ class MixedInputDataset(Dataset):
         # Get image
         img_id = self.df.iloc[idx][self.img_id_column]
         img_path = os.path.join(self.img_dir, img_id)
-        image = decode_image(img_path)
+        img_path = f"{img_path}.jpg"
+        try:
+            # Load image using PIL and convert to tensor
+            image = Image.open(img_path).convert('RGB')
+            image = torch.from_numpy(np.array(image)).permute(2, 0, 1).float() / 255.0
+        except Exception as e:
+            print(f"Error loading image {img_path}: {str(e)}")
+            # Return a placeholder image if loading fails
+            image = torch.zeros((3, 224, 224), dtype=torch.float32)
             
         # Get tabular features
         tabular_features = torch.tensor(
-            self.df.iloc[idx][self.tabular_columns].values.astype(np.float32)
+            self.df[self.tabular_columns].iloc[idx].values.astype(np.float32)
         )
         
         # Get label
