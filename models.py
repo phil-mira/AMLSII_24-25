@@ -8,17 +8,16 @@ class MixedInputModel(nn.Module):
     Neural network that processes both image and tabular data
     
     Parameters:
-    -----------
-    num_tabular_features : int
-        Number of tabular features
-    num_classes : int
-        Number of output classes
-    tabular_hidden_dims : list
-        List of hidden dimensions for tabular MLP
-    dropout_rate : float
-        Dropout rate
-    pretrained : bool
-        Whether to use pretrained weights for the image model
+        num_tabular_features : int
+            Number of tabular features
+        num_classes : int
+            Number of output classes
+        tabular_hidden_dims : list
+            List of hidden dimensions for tabular MLP
+        dropout_rate : float
+            Dropout rate
+        pretrained : bool
+            Whether to use pretrained weights for the image model
     """
     def __init__(self, num_tabular_features, num_classes=2, 
                  tabular_hidden_dims=[64, 32], dropout_rate=0.2, pretrained=True):
