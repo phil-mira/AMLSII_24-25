@@ -24,7 +24,8 @@ class MixedInputModel(nn.Module):
         super(MixedInputModel, self).__init__()
         
         # Image feature extractor (ResNet18)
-        self.image_model = models.resnet18(pretrained=pretrained)
+        # Use weights='IMAGENET1K_V1' instead of pretrained=True (which is deprecated)
+        self.image_model = models.resnet18(weights='IMAGENET1K_V1' if pretrained else None)
         num_image_features = self.image_model.fc.in_features
         self.image_model.fc = nn.Identity()  # Remove final FC layer
         
@@ -47,10 +48,11 @@ class MixedInputModel(nn.Module):
             nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Linear(128, num_classes),
-            nn.Softmax(dim=0)
+            nn.Softmax(dim=1)  # Changed from dim=0 to dim=1 for proper batch handling
         )
         
     def forward(self, image, tabular):
+
         # Process image
         image_features = self.image_model(image)
         
@@ -75,3 +77,5 @@ class MixedInputModel(nn.Module):
             elif isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
                 nn.init.constant_(module.weight, 1)
                 nn.init.constant_(module.bias, 0)
+                
+    

@@ -11,7 +11,6 @@ from train_validate import train
 
 from models import MixedInputModel
 
-import kaggle
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader, TensorDataset
@@ -43,8 +42,8 @@ def main():
     test_files = len([f for f in os.listdir(test_folder) if os.path.isfile(os.path.join(test_folder, f))])
     
     # Only download data if files are missing
-    train_samples = 50
-    test_samples = 10
+    train_samples = 10000
+    test_samples = 1000
     
     if train_files < train_samples or test_files < test_samples:
         print("Downloading data...")
@@ -54,7 +53,7 @@ def main():
 
     train_data, val_data, test_data = preprocess()
 
-    num_augmentations = 1
+    num_augmentations = 3
     train_dataset_path = "data/train_images"
     synth_dir = "data/synthetic_images"
     
@@ -105,12 +104,15 @@ def main():
 
     train_data, val_data, test_data = one_hot(train_data, val_data, test_data)
    
+
+
+
     # Define hyperparameters
-    batch_size = 8
-    num_epochs = 4
+    batch_size = 64
+    num_epochs = 100
     learning_rate = 0.0001
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model_dir = 'saved_models'
+    model_dir = 'saved_models/base'
 
     tabular_features = train_data.columns[2:-1].to_list()
     train_loader, val_loader = create_dataloaders(train_data, val_data, train_dataset_path, 
@@ -133,9 +135,9 @@ def main():
     print(f"Training on {device} with {len(train_data)} training samples, {len(val_data)} validation samples")
 
 
-    train(model, train_loader, val_loader, criterion, optimizer, 
+    model_results = train(model, train_loader, val_loader, criterion, optimizer, 
                      device, num_epochs, model_dir, checkpoint_freq=1, save_best_only=True, 
-                     early_stopping_patience=None, start_epoch=0)
+                     early_stopping_patience=3, start_epoch=0)
  
 
 if __name__ == "__main__":

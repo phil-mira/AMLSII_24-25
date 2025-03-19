@@ -29,6 +29,7 @@ def train_epoch(model, train_loader, criterion, optimizer, device):
     dict: epoch statistics
     """
     model.train()
+    model.to(device)
     train_loss = 0.0
     train_correct = 0
     train_total = 0
