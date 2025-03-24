@@ -126,3 +126,32 @@ def create_dataloaders(train_df, val_df, img_dir, img_id_column, target_column,
     )
     
     return train_loader, val_loader
+
+
+class TestDataset(Dataset):
+        def __init__(self, dataframe, img_dir, img_id_column, tabular_columns):
+            self.dataframe = dataframe
+            self.img_dir = img_dir
+            self.img_id_column = img_id_column
+            self.tabular_columns = tabular_columns
+            
+        def __len__(self):
+            return len(self.dataframe)
+            
+        def __getitem__(self, idx):
+            img_id = self.dataframe.iloc[idx][self.img_id_column]
+            img_path = os.path.join(self.img_dir, img_id)
+            
+            # Handle case where image doesn't have extension in the dataframe
+            if not os.path.exists(img_path):
+                if os.path.exists(img_path + '.jpg'):
+                    img_path += '.jpg'
+                elif os.path.exists(img_path + '.png'):
+                    img_path += '.png'
+            
+            image = Image.open(img_path).convert('RGB')
+            
+            # Get tabular features
+            tabular = torch.tensor(self.dataframe.iloc[idx][self.tabular_columns].values.astype(np.float32))
+            
+            return image, tabular

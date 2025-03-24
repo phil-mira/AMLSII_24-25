@@ -1,4 +1,5 @@
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 
 
@@ -19,8 +20,32 @@ def remove_duplicates(train_data, test_data, duplicates_data):
         test_data.drop(test_data[test_data['image_name'].isin(test_duplicate_ids)].index, inplace=True)
 
 
-# Group same people together so no data leakage to validation
-def create_validation(train_data, val_size):
+def create_smaller_dataset(train_data):
+
+    # Count samples per patient
+    patient_sample_counts = train_data['patient_id'].value_counts().reset_index()
+    patient_sample_counts.columns = ['patient_id', 'sample_count']
+
+    # Sort patients by their sample count (ascending)
+    patient_sample_counts = patient_sample_counts.sort_values('sample_count')
+
+    duplicated_data = train_data.sort_values(['patient_id'])
+
+    # Get all positive samples
+    positive_samples = train_data[train_data['target'] == 1]
+
+    # Remove positive samples from duplicated data
+    duplicated_data = duplicated_data[~duplicated_data['image_name'].isin(positive_samples['image_name'])]
+
+    # Group by patient_id and sample two rows per patient
+    sampled_data = duplicated_data.groupby('patient_id').apply(lambda x: x.sample(n=2, replace=True)).reset_index(drop=True)
+
+    combined_data = pd.concat([positive_samples, sampled_data], ignore_index=True)
+
+    return combined_data
+
+
+def create_validation_all(train_data, val_size):
      
     train_data.sort_values(by = ['patient_id'], inplace = True)
     id_to_split = round(len(train_data)-val_size)
@@ -32,12 +57,39 @@ def create_validation(train_data, val_size):
         id_to_split += 1
         split_val = train_data.iloc[id_to_split]['patient_id']
         next_val =  train_data.iloc[id_to_split+1]['patient_id']
-        
+         
     id_to_split += 1
     val_data = train_data.iloc[id_to_split:]
     train_data = train_data.iloc[:id_to_split]
 
+
     return train_data, val_data
+
+
+def create_validation_small(train_data):
+    
+    # Stratified sampling based on target (melanoma) while respecting patient IDs
+    # Group by patient_id and get the target value for each patient
+    patient_targets = train_data.groupby('patient_id')['target'].mean().reset_index()
+    # If a patient has any positive samples, we'll consider them positive (mean > 0)
+    patient_targets['target_binary'] = (patient_targets['target'] > 0).astype(int)
+
+    # Split patients, not individual samples, stratifying by target
+    train_patients, val_patients = train_test_split(
+        patient_targets['patient_id'],
+        test_size=300,
+        stratify=patient_targets['target_binary'],
+        random_state=42
+    )
+
+    # Split the data based on patient assignment
+    val_data = train_data[train_data['patient_id'].isin(val_patients)]
+    train_data = train_data[train_data['patient_id'].isin(train_patients)]
+
+
+    return train_data, val_data
+
+
 
 def one_hot(train_data, val_data, test_data):
       # One-hot encode categorical features
@@ -82,9 +134,8 @@ def one_hot(train_data, val_data, test_data):
     return train_data, val_data, test_data
 
      
-     
 
-def preprocess():
+def preprocess(smaller=False):
     train_df = pd.read_csv('data/train.csv')
     test_df = pd.read_csv('data/test.csv')
     duplicates_df = pd.read_csv('data/2020_challenge_duplicates.csv')
@@ -95,7 +146,13 @@ def preprocess():
     train_df = train_df.dropna()
     test_df = test_df.dropna()
    
+    if smaller == True:
+        train_df = create_smaller_dataset(train_df)
+        train_df, val_df = create_validation_small(train_df)
+        
+    else:
+        train_df, val_df = create_validation_all(train_df, val_size)
 
-    train_df, val_df = create_validation(train_df, val_size)
+    
     
     return train_df, val_df, test_df

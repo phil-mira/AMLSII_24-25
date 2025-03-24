@@ -29,12 +29,7 @@ def advanced_augmentation(image_dir, output_dir, train_images, augmentations_per
         A.Resize(256, 256)
     ])
     
-    synth_dataset = train_images.copy()
-    for n in range(augmentations_per_image):
-        synth_dataset_n = train_images.copy()
-        synth_dataset_n['image_name'] = synth_dataset_n['image_name'] + f'_synth_{n}'
-        synth_dataset = pd.concat([synth_dataset, synth_dataset_n])
-
+    
 
     # Apply transforms and save images
     count = 0
@@ -56,17 +51,25 @@ def advanced_augmentation(image_dir, output_dir, train_images, augmentations_per
             img_np = np.array(img)
             
             for j in range(augmentations_per_image):
-                augmented = transform(image=img_np)
-                augmented_img = augmented['image']
-                
-                # Save image
+
                 save_path = os.path.join(output_dir, f"{img_file_no_ext}_synth_{j}.jpg")
-                cv2.imwrite(save_path, cv2.cvtColor(augmented_img, cv2.COLOR_RGB2BGR))
-                count += 1
+                
+                if not os.path.exists(save_path):
+                    augmented = transform(image=img_np)
+                    augmented_img = augmented['image']
+
+                    # Ensure the augmented image is the correct size
+                    if augmented_img.shape[:2] != (256, 256):
+                        print(f"Skipping {img_file_no_ext}_synth_{j}.jpg due to incorrect size: {augmented_img.shape[:2]}")
+                        continue
+                    
+                    cv2.imwrite(save_path, cv2.cvtColor(augmented_img, cv2.COLOR_RGB2BGR))
+                    count += 1
+                
         
     print(f"Generated {count} advanced augmented images in {output_dir}")
 
-    return synth_dataset
+
 
 
 def visualize_augmentations(original_img, num_samples=5):
@@ -97,7 +100,7 @@ def visualize_augmentations(original_img, num_samples=5):
     
     # Show original
     plt.subplot(1, num_samples+1, 1)
-    plt.imshow(original_img)
+    plt.imshow(np.array(original_img))
     plt.title("Original")
     plt.axis("off")
   

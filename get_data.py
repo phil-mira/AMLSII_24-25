@@ -46,7 +46,6 @@ def get_files_process(csv_name, samples):
 
     """
 
-    # Extract the file if needed
     csv_file = "./data/" + csv_name 
     df = pd.read_csv(csv_file, nrows=samples)
     image_names = df["image_name"].tolist()
@@ -57,11 +56,13 @@ def get_files_process(csv_name, samples):
 
     for image in image_names:
         image_path = f"./data/siim-isic-melanoma-classification/jpeg/{dataset}/{image}.jpg"
+        output_path = os.path.join(extract_path, f"{image}.jpg")
+        if os.path.exists(output_path):
+            continue
         with Image.open(image_path) as img:
             # Resize to 12.5% of original size
             img = img.resize((256, 256), Image.Resampling.LANCZOS)
             # Save with compression
-            output_path = os.path.join(extract_path, f"{image}.jpg")
             img.save(output_path, "JPEG", quality=60)
 
     

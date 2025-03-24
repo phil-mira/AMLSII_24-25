@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 from torch import optim
 from data_utils import create_dataloaders
-
+from sklearn.metrics import precision_recall_fscore_support, confusion_matrix, roc_auc_score
+from sklearn.metrics import roc_curve
 
 def train_epoch(model, train_loader, criterion, optimizer, device):
     """
@@ -105,6 +106,7 @@ def validate(model, val_loader, criterion, device):
     # For computing metrics
     all_predictions = []
     all_targets = []
+    all_probs = []
     
     with torch.no_grad():
         for batch in val_loader:
@@ -116,14 +118,16 @@ def validate(model, val_loader, criterion, device):
             loss = criterion(outputs, targets)
             
             val_loss += loss.item() * images.size(0)
-            _, predicted = torch.max(outputs.data, 1)
+            probs, predicted = torch.max(outputs.data, 1)
             val_total += targets.size(0)
             val_correct += (predicted == targets).sum().item()
             
             # Store for metrics
             all_predictions.extend(predicted.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
             all_targets.extend(targets.cpu().numpy())
             
+           
             
     
     # Calculate metrics
@@ -134,7 +138,6 @@ def validate(model, val_loader, criterion, device):
     # Calculate additional metrics if sklearn is available
     advanced_metrics = {}
     try:
-        from sklearn.metrics import precision_recall_fscore_support, confusion_matrix, roc_auc_score
         
         # Convert lists to numpy arrays
         y_true = np.array(all_targets)
@@ -145,13 +148,26 @@ def validate(model, val_loader, criterion, device):
         
         # Compute confusion matrix
         cm = confusion_matrix(y_true, y_pred).tolist()
-        
         # Try to compute ROC AUC
         try:
-            roc_auc = roc_auc_score(y_true, y_pred)
-        except:
+            
+            
+            # Compute ROC curve values
+            y_prob = np.array(all_probs)  # Get predicted probabilities for the positive class
+            fpr, tpr, thresholds = roc_curve(y_true, y_prob)
+            roc_auc = roc_auc_score(y_true, y_prob)
+            
+            # Save ROC curve values
+            roc_curve_data = {
+            'fpr': fpr.tolist(),
+            'tpr': tpr.tolist(),
+            'thresholds': thresholds.tolist()
+            }
+            advanced_metrics['roc_curve'] = roc_curve_data
+            
+        except Exception as e:
+            print(f"Error computing ROC AUC or ROC curve: {e}")
             roc_auc = None
-        
         advanced_metrics = {
             'precision': float(precision),
             'recall': float(recall),
