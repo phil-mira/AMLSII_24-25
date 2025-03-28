@@ -33,41 +33,44 @@ def advanced_augmentation(image_dir, output_dir, train_images, augmentations_per
 
     # Apply transforms and save images
     count = 0
-    for i, img_file in enumerate(os.listdir(image_dir)):
 
-        # Drop the file extension from img_file
-        img_file_no_ext = os.path.splitext(img_file)[0]
+    if augmentations_per_image > 0:
+        print(f"Generating synthetic images...")
+        for i, img_file in enumerate(os.listdir(image_dir)):
 
-        if img_file_no_ext in train_images['image_name'].values:
-            
-            img_path = os.path.join(image_dir, img_file)
+            # Drop the file extension from img_file
+            img_file_no_ext = os.path.splitext(img_file)[0]
 
-            try:
-                img = Image.open(img_path).convert('RGB')
-            except Exception as e:
-                print(f"Error loading {img_file}: {e}")
-
-            # Convert PIL to numpy array
-            img_np = np.array(img)
-            
-            for j in range(augmentations_per_image):
-
-                save_path = os.path.join(output_dir, f"{img_file_no_ext}_synth_{j}.jpg")
+            if img_file_no_ext in train_images['image_name'].values:
                 
-                if not os.path.exists(save_path):
-                    augmented = transform(image=img_np)
-                    augmented_img = augmented['image']
+                img_path = os.path.join(image_dir, img_file)
 
-                    # Ensure the augmented image is the correct size
-                    if augmented_img.shape[:2] != (256, 256):
-                        print(f"Skipping {img_file_no_ext}_synth_{j}.jpg due to incorrect size: {augmented_img.shape[:2]}")
-                        continue
+                try:
+                    img = Image.open(img_path).convert('RGB')
+                except Exception as e:
+                    print(f"Error loading {img_file}: {e}")
+
+                # Convert PIL to numpy array
+                img_np = np.array(img)
+                
+                for j in range(augmentations_per_image):
+
+                    save_path = os.path.join(output_dir, f"{img_file_no_ext}_synth_{j}.jpg")
                     
-                    cv2.imwrite(save_path, cv2.cvtColor(augmented_img, cv2.COLOR_RGB2BGR))
-                    count += 1
-                
-        
-    print(f"Generated {count} advanced augmented images in {output_dir}")
+                    if not os.path.exists(save_path):
+                        augmented = transform(image=img_np)
+                        augmented_img = augmented['image']
+
+                        # Ensure the augmented image is the correct size
+                        if augmented_img.shape[:2] != (256, 256):
+                            print(f"Skipping {img_file_no_ext}_synth_{j}.jpg due to incorrect size: {augmented_img.shape[:2]}")
+                            continue
+                        
+                        cv2.imwrite(save_path, cv2.cvtColor(augmented_img, cv2.COLOR_RGB2BGR))
+                        count += 1
+                    
+            
+        print(f"Generated {count} advanced augmented images in {output_dir}")
 
 
 
