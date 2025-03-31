@@ -1,22 +1,17 @@
 import os
 import get_data
-import json
-
 
 import get_data
 from preprocess import preprocess, one_hot
 from synthetic_data_generate import advanced_augmentation
-from data_utils import create_dataloaders, TestDataset
+from data_utils import create_dataloaders
 from train_validate import train
 
-from models import BaseModel
+from models import BaseModel, SexBasedModel, BrightnessBasedModel
 
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, TensorDataset
-import numpy as np
-from torchvision import transforms
-from PIL import Image
+
 
 
 def main():
@@ -42,15 +37,6 @@ def main():
     """
 
 
-    # Navigate to .kaggle directory and load credentials
-    kaggle_path = os.path.join(os.path.expanduser('~'), '.kaggle')
-    if not os.path.exists(kaggle_path):
-        os.makedirs(kaggle_path)
-
-    # Load kaggle.json file
-    with open(os.path.join(kaggle_path, 'kaggle.json')) as f:
-        api_token = json.load(f)
-
     # Check if data already exists
     train_folder = "data/train_images"
     test_folder = "data/test_images"
@@ -72,29 +58,38 @@ def main():
         get_data.run(train_samples, test_samples)
     else:
         print("Data already exists, skipping download")
-    
 
-    train_data, val_data, test_data = preprocess(smaller=True)
 
-    num_augmentations = 3
     train_dataset_path = "data/train_images"
     synth_dir = "data/synthetic_images"
-    
-    # Create synthetic images directory if it doesn't exist
-    os.makedirs(synth_dir, exist_ok=True)
-    
-    # Count existing synthetic images
-    synthetic_files = len([f for f in os.listdir(train_dataset_path) if os.path.isfile(os.path.join(train_dataset_path, f))])
-    expected_synthetic_files = len(train_data) * (num_augmentations + 1)
 
+    data_model = [
+     ['base_all', BaseModel(num_tabular_features=9), 0, False],
+     ['base_small', BaseModel(num_tabular_features=9), 0, True],
+     ['base_small_3xaug', BaseModel(num_tabular_features=9), 3, True],
+     ['base_small_5xaug', BaseModel(num_tabular_features=9), 5, True],
+     ['sex_based_all', SexBasedModel(num_tabular_features=9), 0, False],
+     ['sex_based_small', SexBasedModel(num_tabular_features=9), 0, True],
+     ['sex_based_small_3xaug', SexBasedModel(num_tabular_features=9), 3, True],
+     ['sex_based_small_5xaug', SexBasedModel(num_tabular_features=9), 5, True],
+     ['brightness_based_all', BrightnessBasedModel(num_tabular_features=9), 0, False],
+     ['brightness_based_small', BrightnessBasedModel(num_tabular_features=9), 0, True],
+     ['brightness_based_small_3xaug', BrightnessBasedModel(num_tabular_features=9), 3, True],
+     ['brightness_based_small_5xaug', BrightnessBasedModel(num_tabular_features=9), 5, True]
+    ]
     
-    synthetic_dataset = synth_data(train_data, num_augmentations)
+    for data, model, num_augmentations, small in data_model:
 
+        train_data, val_data, test_data = preprocess(smaller=small)
     
-    if True:
-        print(f"Generating {expected_synthetic_files} synthetic images...")
+
+        # Create synthetic images directory if it doesn't exist
+        os.makedirs(synth_dir, exist_ok=True)
+
+        synthetic_dataset = synth_data(train_data, num_augmentations)
+
         advanced_augmentation(train_dataset_path, synth_dir, train_data, augmentations_per_image=num_augmentations)
-        
+
         # Move synthetic images to train images folder
         print("Moving synthetic images to train folder...")
         synth_image_files = [f for f in os.listdir(synth_dir) if os.path.isfile(os.path.join(synth_dir, f))]
@@ -105,17 +100,32 @@ def main():
                 os.rename(src_path, dst_path)  # Move file (rename operation)
         print(f"Moved {len(synth_image_files)} synthetic images to training directory")
 
-    else:
-        print("Synthetic images already exist, skipping generation")
+        train_data, val_data, test_data = one_hot(synthetic_dataset, val_data, test_data)
+
+        run_model(train_data, val_data, train_dataset_path, model, data_type=data)
 
 
-    
-    train_data_small, val_data_small, test_data_small = one_hot(synthetic_dataset, val_data, test_data)
-
-    model_results_small, model_small = base_model(train_data_small, val_data_small, train_dataset_path, data_type='small_small')
 
 
 def synth_data(train_data, num_augmentations):
+    """
+    Synthesize additional data by creating copies of the training dataset.
+    This function creates multiple copies of the training data to augment the dataset,
+    with each copy having a modified image name to indicate it's synthetic data.
+    Parameters:
+    ----------
+    train_data : pandas.DataFrame
+        The original training dataset to be augmented.
+        Expected to have an 'image_name' column.
+    num_augmentations : int
+        The number of synthetic copies to create.
+    Returns:
+    -------
+    pandas.DataFrame
+        An augmented dataset containing the original data plus 'num_augmentations'
+        copies with modified image names.
+    """
+
     synth_dataset = train_data.copy()
     for n in range(num_augmentations):
         synth_dataset_n = train_data.copy()
@@ -126,9 +136,9 @@ def synth_data(train_data, num_augmentations):
     return train_data
 
 
-def base_model(train_data, val_data, train_dataset_path, data_type):
+def run_model(train_data, val_data, train_dataset_path, model, data_type):
     """
-    Trains a base model using both tabular and image data.
+    Trains a model using both tabular and image data.
     Args:
         train_data (pd.DataFrame): The training dataset containing tabular features and target labels.
         val_data (pd.DataFrame): The validation dataset containing tabular features and target labels.
@@ -142,10 +152,10 @@ def base_model(train_data, val_data, train_dataset_path, data_type):
 
     # Define hyperparameters
     batch_size = 64
-    num_epochs = 100
-    learning_rate = 0.0001
+    num_epochs = 10
+    learning_rate = 0.00001
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model_dir = f'saved_models/base_{data_type}'
+    model_dir = f'saved_models/{data_type}'
 
     tabular_features = train_data.columns[2:-1].to_list()
     train_loader, val_loader = create_dataloaders(train_data, val_data, train_dataset_path, 
@@ -158,74 +168,29 @@ def base_model(train_data, val_data, train_dataset_path, data_type):
     # Create directory for saving models if it doesn't exist
     os.makedirs(model_dir, exist_ok=True)
 
-    model = BaseModel(num_tabular_features=len(tabular_features), tabular_hidden_dims=[512, 128])
 
     # Define loss function and optimizer
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    # Learning rate scheduler - Cosine Annealing
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=num_epochs,  # Total number of epochs
+        eta_min=1e-8       # Minimum learning rate
+    )
 
 
     print(f"Training on {device} with {len(train_data)} training samples, {len(val_data)} validation samples")
 
 
-    model_results = train(model, train_loader, val_loader, criterion, optimizer, 
+    model_results = train(model, train_loader, val_loader, criterion, optimizer, scheduler, 
                      device, num_epochs, model_dir, checkpoint_freq=1, save_best_only=True, 
-                     early_stopping_patience=6, start_epoch=0)
+                     early_stopping_patience=3, start_epoch=0)
     
     return model_results, model
 
 
 
-def predict_with_model(model, test_data, test_dataset_path, device=None):
-    """
-    Makes predictions using a trained model on test data without target labels.
-    
-    Args:
-        model: The trained model to use for predictions
-        test_data: DataFrame containing test data (without target column)
-        test_dataset_path: Path to test images directory
-        device: Computation device (defaults to available GPU or CPU)
-    
-    Returns:
-        predictions: List of model predictions
-    """
-    if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    model.to(device)
-    model.eval()  # Set model to evaluation mode
-    
-    # Get tabular features (all columns except image_name)
-    tabular_features = test_data.columns[1:].to_list()
-    
-    
-    # Create test dataset and dataloader
-    test_dataset = TestDataset(test_data, test_dataset_path, 'image_name', tabular_features)
-    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
-    
-    predictions = []
-    image_ids = []
-    
-    with torch.no_grad():  # Disable gradient calculation for inference
-        for i, (images, tabular) in enumerate(test_loader):
-            images = images.to(device)
-            tabular = tabular.to(device)
-            
-            outputs = model(images, tabular)
-   
-            
-            # Store predictions
-            predictions.extend(outputs.cpu().numpy())
-            
-            # Store image IDs for this batch
-            batch_indices = range(i * test_loader.batch_size, 
-                                 min((i + 1) * test_loader.batch_size, len(test_data)))
-            batch_img_ids = [test_data.iloc[idx]['image_name'] for idx in batch_indices]
-            image_ids.extend(batch_img_ids)
-    
-    # Create a dictionary mapping image IDs to predictions
-    results = {'image_name': image_ids, 'prediction': predictions}
-    return pd.DataFrame(results)
 
 if __name__ == "__main__":
 

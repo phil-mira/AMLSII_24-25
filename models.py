@@ -21,6 +21,24 @@ class BaseModel(nn.Module):
     """
     def __init__(self, num_tabular_features, num_classes=1, 
                  tabular_hidden_dims=[512, 128], pretrained=True):
+        """
+        Initialize the base model architecture.
+
+        This model combines a ResNet-18 for image feature extraction with an MLP for 
+        processing tabular data. The features from both sources are concatenated and 
+        passed through a classifier to make the final prediction.
+
+        Parameters:
+            num_tabular_features : int
+                Number of tabular features
+            num_classes : int, default=1
+                Number of output classes
+            tabular_hidden_dims : list, default=[512, 128]
+                List of hidden dimensions for tabular MLP
+            pretrained : bool, default=True
+                Whether to use pretrained weights for the image model
+        """
+        
         super(BaseModel, self).__init__()
         
         # Image feature extractor 
@@ -54,6 +72,19 @@ class BaseModel(nn.Module):
         )
         
     def forward(self, image, tabular):
+        """
+        Forward pass through the neural network.
+
+        Parameters:
+            image : torch.Tensor
+                Input images, shape (batch_size, channels, height, width)
+            tabular : torch.Tensor
+                Tabular features, shape (batch_size, num_tabular_features)
+                
+        Returns:
+            torch.Tensor
+                Model predictions, shape (batch_size, num_classes)
+        """
 
         # Process image
         image_features = self.image_model(image)
@@ -100,6 +131,23 @@ class SexBasedModel(nn.Module):
     """
     def __init__(self, num_tabular_features, num_classes=1, 
                  tabular_hidden_dims=[512, 128], pretrained=True):
+        """
+        Initialize the sex-based model architecture with separate pathways for male and female images.
+
+        This model contains two separate ResNet-18 networks for processing images from male and female 
+        subjects, and a shared tabular data processor. The model combines the image features with 
+        processed tabular features to make the final prediction.
+
+        Parameters:
+            num_tabular_features : int
+                Number of tabular features (including sex feature)
+            num_classes : int, default=1
+                Number of output classes
+            tabular_hidden_dims : list, default=[512, 128]
+                List of hidden dimensions for tabular MLP
+            pretrained : bool, default=True
+                Whether to use pretrained weights for the image models
+        """
         super(SexBasedModel, self).__init__()
         
         # Male and female image feature extractors
@@ -138,6 +186,22 @@ class SexBasedModel(nn.Module):
         )
         
     def forward(self, image, tabular):
+        """
+        Forward pass for the sex-based model.
+
+        The method processes both image and tabular data, routing each image to either
+        the male or female image model based on the sex feature from tabular data.
+
+        Parameters:
+            image : torch.Tensor
+                Batch of images to process (B, C, H, W)
+            tabular : torch.Tensor
+                Batch of tabular features (B, num_features), with sex as the last column
+                
+        Returns:
+            torch.Tensor
+                Model predictions (B, num_classes)
+        """
         # Split tabular data - assuming sex is the last column
         # (0 for male, 1 for female in a binary encoding)
         sex = tabular[:, -1:]
@@ -153,9 +217,9 @@ class SexBasedModel(nn.Module):
         # For each sample in the batch, choose the appropriate model
         for i in range(batch_size):
             if sex[i, 0] < 0.5:  # Male
-                image_features[i] = self.male_image_model(image[i].unsqueeze(0))
+                image_features[i] = self.male_image_model(image[i])
             else:  # Female
-                image_features[i] = self.female_image_model(image[i].unsqueeze(0))
+                image_features[i] = self.female_image_model(image[i])
         
         # Combine features
         combined = torch.cat((image_features, tabular_features), dim=1)
@@ -194,7 +258,21 @@ class BrightnessBasedModel(nn.Module):
             Whether to use pretrained weights for the image model
     """
     def __init__(self, num_tabular_features, num_classes=1, 
-                 tabular_hidden_dims=[512, 128], pretrained=True):
+                 tabular_hidden_dims=[512, 128], pretrained=True):  
+        """
+        Neural network that processes both image and tabular data, using different models for
+        dark and light images based on brightness.
+
+        Parameters:
+            num_tabular_features : int
+                Number of tabular features
+            num_classes : int
+                Number of output classes
+            tabular_hidden_dims : list
+                List of hidden dimensions for tabular MLP
+            pretrained : bool
+                Whether to use pretrained weights for the image model
+        """
         super(BrightnessBasedModel, self).__init__()
         
         # Dark and Light image feature extractors
@@ -233,6 +311,22 @@ class BrightnessBasedModel(nn.Module):
         )
         
     def forward(self, image, tabular):
+        """
+        Forward pass for the brightness-based model.
+
+        The method processes both image and tabular data, routing each image to either
+        the dark or light image model based on its brightness level.
+
+        Parameters:
+            image : torch.Tensor
+                Batch of images to process (B, C, H, W)
+            tabular : torch.Tensor
+                Batch of tabular features (B, num_features)
+                
+        Returns:
+            torch.Tensor
+                Model predictions (B, num_classes)
+        """
 
         # Process tabular data 
         tabular_features = self.tabular_model(tabular)
@@ -251,9 +345,10 @@ class BrightnessBasedModel(nn.Module):
             
             # Route to appropriate model based on brightness
             if brightness < brightness_threshold:  # Dark image
-                image_features[i] = self.dark_image_model(img.unsqueeze(0))
+                image_features[i] = self.dark_image_model(img)
+                
             else:  # Light image
-                image_features[i] = self.light_image_model(img.unsqueeze(0))
+                image_features[i] = self.light_image_model(img)
         
         
         # Combine features

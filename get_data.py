@@ -39,12 +39,22 @@ def verify_image_sizes(image_folder_path):
 
 def get_files_process(csv_name, samples):
     """
-    Args:
-        competition_name - competitoin path from kaggle
-        file_name - local file path for images folder
-        samples - how many samples of dataset to include
-
+    Process image files from a dataset, resize them, and save them to a new location.
+    This function reads a CSV file containing image names, loads the corresponding images
+    from a specified path, resizes them to 256x256 pixels, and saves them with compression
+    to a new directory. If an output file already exists, it skips processing that image.
+        csv_name (str): Name of the CSV file containing image information, located in './data/'
+        samples (int): Number of samples from the dataset to process
+    Returns:
+        None
+    Note:
+        - The function expects images to be located in './data/siim-isic-melanoma-classification/jpeg/{dataset}/'
+        - Processed images are saved to './data/{dataset}_images/'
+        - Images are resized to 256x256 pixels and saved as JPEG with 60% quality
     """
+    
+
+
 
     csv_file = "./data/" + csv_name 
     df = pd.read_csv(csv_file, nrows=samples)
@@ -65,9 +75,28 @@ def get_files_process(csv_name, samples):
             # Save with compression
             img.save(output_path, "JPEG", quality=60)
 
-    
+
+
 
 def run(train_samples, test_samples):
+    """
+    Downloads and processes image files for training and testing datasets.
+    This function creates necessary directories for storing images, downloads the specified
+    number of samples from training and testing datasets, and verifies the consistency
+    of image sizes in both datasets.
+    Parameters:
+    -----------
+    train_samples : int
+        Number of samples to download from the training dataset.
+    test_samples : int
+        Number of samples to download from the testing dataset.
+    Returns:
+    --------
+    None
+        The function creates directories and downloads images as a side effect
+        but does not return any value.
+    """
+
 
     os.makedirs("data/train_images", exist_ok=True)
     os.makedirs("data/test_images", exist_ok=True)

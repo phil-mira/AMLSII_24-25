@@ -8,7 +8,7 @@ from data_utils import create_dataloaders
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix, roc_auc_score
 from sklearn.metrics import roc_curve
 
-def train_epoch(model, train_loader, criterion, optimizer, device):
+def train_epoch(model, train_loader, criterion, optimizer, device, scheduler=None):
     """
     Train for one epoch
     
@@ -24,6 +24,8 @@ def train_epoch(model, train_loader, criterion, optimizer, device):
         Optimizer
     device : torch.device
         Device to run training on
+    scheduler : torch.optim.lr_scheduler
+        Learning rate scheduler (optional)
     
     Returns:
     --------
@@ -42,7 +44,9 @@ def train_epoch(model, train_loader, criterion, optimizer, device):
         
         # Forward pass
         outputs = model(images, tabular)
-        loss = criterion(outputs, targets)
+        
+        # Calculate loss on raw model outputs
+        loss = criterion(outputs.flatten(), targets)
 
         if torch.isnan(loss).item(): 
             print("NaN loss detected, skipping batch")
@@ -53,15 +57,23 @@ def train_epoch(model, train_loader, criterion, optimizer, device):
         loss.backward()
         optimizer.step()
         
+        # Update learning rate with cosine annealing scheduler if provided
+        if scheduler is not None and isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingLR):
+            scheduler.step()
+        
         # Record statistics
         train_loss += loss.item() * images.size(0)
-        _, predicted = torch.max(outputs.data, 1)
+        predicted = (outputs > 0.5).int().flatten()
         train_total += targets.size(0)
         train_correct += (predicted == targets).sum().item()
         
         # Print batch progress
         if (batch_idx + 1) % 10 == 0:
-            print(f"Batch {batch_idx+1}/{len(train_loader)}, Loss: {loss.item():.4f}")
+            print(f"Batch {batch_idx+1}/{len(train_loader)}, Loss: {loss.item():.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
+    
+    # Step the scheduler if it's not a batch-level scheduler
+    if scheduler is not None and not isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingLR):
+        scheduler.step()
     
     # Calculate epoch statistics
     epoch_loss = train_loss / train_total
@@ -115,10 +127,11 @@ def validate(model, val_loader, criterion, device):
             targets = batch['label'].to(device)
             
             outputs = model(images, tabular)
-            loss = criterion(outputs, targets)
+            loss = criterion(outputs.flatten(), targets)
             
             val_loss += loss.item() * images.size(0)
-            probs, predicted = torch.max(outputs.data, 1)
+            predicted = (outputs > 0.5).int().flatten()
+            probs = outputs.flatten()
             val_total += targets.size(0)
             val_correct += (predicted == targets).sum().item()
             
@@ -173,7 +186,8 @@ def validate(model, val_loader, criterion, device):
             'recall': float(recall),
             'f1': float(f1),
             'confusion_matrix': cm,
-            'roc_auc': roc_auc
+            'roc_auc': roc_auc,
+            'roc_curve': roc_curve_data
         }
         
     except ImportError:
@@ -185,14 +199,15 @@ def validate(model, val_loader, criterion, device):
         'correct': val_correct,
         'total': val_total,
         'advanced_metrics': advanced_metrics,
-        'predictions': all_predictions,
-        'targets': all_targets
+        'probabilities': [float(x) for x in y_prob],
+        'predictions': [int(x) for x in all_predictions],
+        'targets': [int(x) for x in all_targets]
     }
 
 
 
 
-def train(model, train_loader, val_loader, criterion, optimizer, 
+def train(model, train_loader, val_loader, criterion, optimizer, scheduler, 
                      device, num_epochs, model_dir, checkpoint_freq=1, save_best_only=True, 
                      early_stopping_patience=None, start_epoch=0):
     """
@@ -248,7 +263,7 @@ def train(model, train_loader, val_loader, criterion, optimizer,
         print(f"Epoch {epoch+1}/{num_epochs}")
         
         # Training phase
-        train_stats = train_epoch(model, train_loader, criterion, optimizer, device)
+        train_stats = train_epoch(model, train_loader, criterion, optimizer, device, scheduler)
         
         # Validation phase
         val_stats = validate(model, val_loader, criterion, device)
@@ -283,7 +298,7 @@ def train(model, train_loader, val_loader, criterion, optimizer,
                 'train_loss': train_stats['loss'],
                 'train_acc': train_stats['accuracy'],
                 'best_val_loss': best_val_loss,
-                'best_val_acc': best_val_acc,
+                'best_val_acc': best_val_acc
             }
             
             
@@ -324,7 +339,9 @@ def train(model, train_loader, val_loader, criterion, optimizer,
         'best_val_acc': best_val_acc,
         'final_val_loss': final_val_stats['loss'],
         'final_val_acc': final_val_stats['accuracy'],
-        'advanced_metrics': final_val_stats['advanced_metrics']
+        'advanced_metrics': final_val_stats['advanced_metrics'],
+        'predictions':final_val_stats['predictions'],
+        'targets':final_val_stats['targets']
     }
     
     # Save model results

@@ -54,7 +54,7 @@ class MixedInputDataset(Dataset):
         )
         
         # Get label
-        label = torch.tensor(self.df.iloc[idx][self.target_column], dtype=torch.long)
+        label = torch.tensor(self.df.iloc[idx][self.target_column], dtype=torch.float32)
         
         return {
             'image': image, 
@@ -129,18 +129,33 @@ def create_dataloaders(train_df, val_df, img_dir, img_id_column, target_column,
 
 
 class TestDataset(Dataset):
+        """
+        Dataset for test data (without labels) combining images and tabular features
+            
+        Parameters:
+        -----------
+        dataframe : pandas DataFrame
+            DataFrame containing image IDs and tabular features
+        img_dir : str
+            Directory containing the images
+        img_id_column : str
+            Column name in DataFrame that contains image IDs/filenames
+        tabular_columns : list
+            List of column names to use as tabular features
+        """
         def __init__(self, dataframe, img_dir, img_id_column, tabular_columns):
-            self.dataframe = dataframe
+            self.df = dataframe
             self.img_dir = img_dir
             self.img_id_column = img_id_column
             self.tabular_columns = tabular_columns
             
         def __len__(self):
-            return len(self.dataframe)
+            return len(self.df)
             
         def __getitem__(self, idx):
-            img_id = self.dataframe.iloc[idx][self.img_id_column]
+            img_id = self.df.iloc[idx][self.img_id_column]
             img_path = os.path.join(self.img_dir, img_id)
+            img_path = f"{img_path}.jpg"
             
             # Handle case where image doesn't have extension in the dataframe
             if not os.path.exists(img_path):
@@ -150,8 +165,9 @@ class TestDataset(Dataset):
                     img_path += '.png'
             
             image = Image.open(img_path).convert('RGB')
+            image = torch.from_numpy(np.array(image)).permute(2, 0, 1).float() / 255.0
             
             # Get tabular features
-            tabular = torch.tensor(self.dataframe.iloc[idx][self.tabular_columns].values.astype(np.float32))
+            tabular = torch.tensor(self.df.iloc[idx][self.tabular_columns].values.astype(np.float32))
             
             return image, tabular
