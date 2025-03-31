@@ -1,10 +1,10 @@
-name: amls_II
+name: amls_ii
 channels:
   - conda-forge
   - defaults
 
 dependencies:
-  - python=3.12.7
+  - python=3.12.3
   - pip
   - pip:
     - -r requirements.txt

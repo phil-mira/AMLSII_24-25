@@ -4,3 +4,6 @@ scikit-learn
 matplotlib
 pandas 
 numpy
+torch
+Pillow
+seaborn
