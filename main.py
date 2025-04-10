@@ -18,21 +18,19 @@ def main():
     """
     Main function to handle data preparation, augmentation, and model training.
     This function performs the following tasks:
-    1. Ensures the Kaggle API credentials are available and loads them.
-    2. Checks if the required training and testing data exists locally.
+    1. Checks if the required training and testing data exists locally.
        - If not, downloads the data using the `get_data.run` function.
-    3. Preprocesses the data into training, validation, and testing sets.
-    4. Generates synthetic images using advanced augmentation techniques.
+    2. Preprocesses the data into training, validation, and testing sets.
+    3. Generates synthetic images using advanced augmentation techniques.
        - Ensures synthetic images are created only if they do not already exist.
        - Moves the generated synthetic images to the training directory.
-    5. Converts the datasets into one-hot encoded format.
-    6. Trains a base model using the prepared datasets.
+    4. Converts the datasets into one-hot encoded format.
+    5. Trains all the models sequentially.
     Note:
     - The function assumes the presence of helper functions such as `get_data.run`, 
       `preprocess`, `synth_data`, `advanced_augmentation`, `one_hot`, and `base_model`.
     - Directory paths and dataset sizes are hardcoded but can be modified as needed.
     Raises:
-        FileNotFoundError: If the Kaggle API credentials file (`kaggle.json`) is missing.
         Exception: For any issues during data download, preprocessing, or augmentation.
     """
 
